@@ -1,14 +1,13 @@
 {
-  "name": "responsive-login-form-tailwind-react-app",
-  "description": "Responsive login form using Tailwind CSS in React",
+  "name": "ygn-tech-admin",
+  "description": "YGN_TECH_ADMINPANEL",
   "author": {
-    "name": "Clue Mediator",
-    "email": "contact@cluemediator.com",
-    "url": "https://www.cluemediator.com"
+    "name": "YGN TECH"
   },
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "antd": "^4.24.15",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3",

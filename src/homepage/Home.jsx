@@ -1,28 +1,49 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import ygn_logo from "../image/ygn.jpg";
 import { baseURL } from "../constant";
+import { DatePicker } from "antd";
+import { useParams } from "react-router-dom";
 
 const Home = () => {
   const [base64Image, setBase64Image] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
-  const isLoggedIn = localStorage.getItem("isLoggedIn");
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (isLoggedIn !== "true") {
-      navigate("/login");
-    }
-  }, [isLoggedIn]);
-
   const [formData, setFormData] = useState({
     title: "",
     name: "",
     type: "",
     description: "",
     image: "",
+    date: "",
   });
+  const isLoggedIn = localStorage.getItem("isLoggedIn");
+  const navigate = useNavigate();
+  const { id } = useParams();
+
+  const getDataById = async () => {
+    try {
+      const response = await fetch(`${baseURL}/get-blog-details?_id=${id}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch data");
+      }
+      const responseData = await response.json();
+      setFormData(responseData?.data);
+    } catch (error) {
+      setErrorMsg(error);
+    }
+  };
+
+  useEffect(() => {
+    if (id) {
+      getDataById();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (isLoggedIn !== "true") {
+      navigate("/login");
+    }
+  }, [isLoggedIn]);
 
   const handleImageChange = (event) => {
     const file = event.target.files[0];
@@ -52,8 +73,16 @@ const Home = () => {
     }
   };
 
+  const handleDateChange = (dateString) => {
+    setFormData((prevData) => ({
+      ...prevData,
+      date: dateString,
+    }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
+    setErrorMsg(null);
     const options = {
       method: "POST",
       headers: {
@@ -61,7 +90,8 @@ const Home = () => {
       },
       body: JSON.stringify(formData),
     };
-    fetch(`${baseURL}/create-blog`, options)
+    const url = id ? `${baseURL}/edit-blog/${id}` : `${baseURL}/create-blog`; // Adjust the URL based on the presence of ID
+    fetch(url, options)
       .then((response) => {
         if (!response.ok) {
           setErrorMsg("Something Went Wrong!");
@@ -76,8 +106,10 @@ const Home = () => {
           type: "",
           description: "",
           image: "",
+          date: "",
         });
         setBase64Image(null);
+        navigate("/blog-list")
       })
       .catch((error) => {
         setErrorMsg("Something Went Wrong!");
@@ -88,7 +120,18 @@ const Home = () => {
   return (
     <>
       <div className="flex relative justify-between py-[10px] items-center px-[40px] bg-slate-100 border-b border-slate-300 mb-5">
-        <img src={ygn_logo} alt="YGN" className="mix-blend-multiply" style={{ width: "10%" }} />
+        <img
+          src={ygn_logo}
+          alt="YGN"
+          className="mix-blend-multiply"
+          style={{ width: "10%" }}
+        />
+        <div
+          onClick={() => navigate("/blog-list")}
+          style={{ cursor: "pointer" }}
+        >
+          <b>BlogList</b>
+        </div>
         <div
           onClick={() => {
             localStorage.removeItem("isLoggedIn");
@@ -113,7 +156,7 @@ const Home = () => {
         >
           Create A Blog
         </h1>
-        <div className="relative z-0 w-full mb-5 group">
+        <div className="relative z-0 w-full mb-10 group">
           <input
             type="text"
             name="title"
@@ -131,8 +174,21 @@ const Home = () => {
             Title
           </label>
         </div>
+        <div className="relative max-w-sm my-4">
+          <label
+            for="date"
+            className="peer-focus:font-medium absolute text-[18px] text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-6 scale-75 top-0 -z-10 origin-[0] peer-focus:start-0 rtl:peer-focus:translate-x-1/4 peer-focus:text-blue-600 peer-focus:dark:text-blue-500 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6"
+          >
+            Date
+          </label>
+          <DatePicker
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-10 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+            placeholder="Select date" // Placeholder text
+            onChange={(date, dateString) => handleDateChange(date, dateString)} // Handle date change
+          />
+        </div>
         <div className="grid md:grid-cols-2 md:gap-6">
-          <div className="relative z-0 w-full mb-5 group">
+          <div className="relative z-0 w-full mb-7 group">
             <input
               type="text"
               name="name"
@@ -150,7 +206,7 @@ const Home = () => {
               Name
             </label>
           </div>
-          <div className="relative z-0 w-full mb-5 group">
+          <div className="relative z-0 w-full mb-7 group">
             <input
               type="text"
               name="type"
@@ -169,9 +225,9 @@ const Home = () => {
             </label>
           </div>
         </div>
-        <div className="flex flex-col mb-8">
+        <div className="flex flex-col mb-10 relative mt-5">
           <label
-            class="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+            className="peer-focus:font-medium absolute text-[18px] text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-6 scale-75 top-0 -z-10 origin-[0] peer-focus:start-0 rtl:peer-focus:translate-x-1/4 peer-focus:text-blue-600 peer-focus:dark:text-blue-500 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6"
             for="image"
           >
             Upload file
@@ -179,7 +235,7 @@ const Home = () => {
           <input
             name="image"
             onChange={handleImageChange}
-            class="block cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+            className="block cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
             aria-describedby="image"
             id="image"
             type="file"
@@ -212,7 +268,7 @@ const Home = () => {
           type="submit"
           className="text-white mt-4 bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-8 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
         >
-          Submit
+          {id ? "Update" : "Submit"}
         </button>
         {errorMsg && <div className="text-[16px] text-red-600">{errorMsg}</div>}
       </form>
