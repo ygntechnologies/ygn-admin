@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ygn_logo from "../image/ygn.jpg";
 import { baseURL } from "../constant";
 import { DatePicker } from "antd";
-import dayjs from "dayjs";
+import dayjs from "dayjs"; // Required to fix the white screen crash
 
 const Home = () => {
   const [base64Image, setBase64Image] = useState(null);
@@ -25,7 +25,6 @@ const Home = () => {
 
   const getDataById = async () => {
     try {
-      setErrorMsg(null);
       const response = await fetch(`${baseURL}/get-blog-details?_id=${id}`);
       if (!response.ok) throw new Error("Failed to fetch data");
       const responseData = await response.json();
@@ -40,7 +39,6 @@ const Home = () => {
         date: data.date || "",
       });
 
-      // Show existing image (Base64 or Cloud URL)
       if (data.image) setBase64Image(data.image);
     } catch (error) {
       console.error(error);
@@ -55,7 +53,7 @@ const Home = () => {
     if (isLoggedIn !== "true") navigate("/login");
   }, [isLoggedIn, navigate]);
 
-  // ✅ Fix 1: Cloudinary Upload - Reduces payload size from MBs to Bytes
+  // ✅ Cloudinary Upload (Uses dovwuouwx cloud and ygntechnologies preset)
   const handleImageChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -77,14 +75,11 @@ const Home = () => {
       const fileData = await resp.json();
       
       if (fileData.secure_url) {
-        const imageUrl = fileData.secure_url;
-        setBase64Image(imageUrl); 
-        setFormData((prev) => ({ ...prev, image: imageUrl }));
-      } else {
-        throw new Error("Cloudinary rejected upload");
+        setBase64Image(fileData.secure_url); 
+        setFormData((prev) => ({ ...prev, image: fileData.secure_url }));
       }
     } catch (err) {
-      setErrorMsg("Image upload failed. Try a smaller file.");
+      setErrorMsg("Image upload failed.");
     } finally {
       setIsImageProcessing(false);
     }
@@ -94,8 +89,7 @@ const Home = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ✅ Fix 2: DatePicker White Screen Crash
-  // We use dayjs to ensure the value is always a valid object for Ant Design
+  // ✅ Fixed Date Change Logic
   const handleDateChange = (date, dateString) => {
     setFormData((prev) => ({
       ...prev,
@@ -107,13 +101,6 @@ const Home = () => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (isImageProcessing) {
-      setErrorMsg("Please wait for image upload to finish.");
-      return;
-    }
-
-    // Since we can't fix CORS on the backend, we use standard POST
-    // Cloudinary URL makes this payload very small
     fetch(id ? `${baseURL}/edit-blog/${id}` : `${baseURL}/create-blog`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -125,13 +112,12 @@ const Home = () => {
       })
       .catch((err) => {
         //
-        setErrorMsg("Network Error: Backend may be blocking this request (CORS).");
+        setErrorMsg("Failed to save data. Payload too large or CORS error.");
       });
   };
 
   return (
     <>
-      {/* Header */}
       <div className="flex justify-between py-[10px] items-center px-[40px] bg-slate-100 border-b mb-5">
         <img src={ygn_logo} alt="YGN" className="mix-blend-multiply w-[100px]" />
         <div onClick={() => navigate("/blog-list")} className="cursor-pointer font-bold">BlogList</div>
@@ -146,7 +132,7 @@ const Home = () => {
           <input name="title" value={formData.title} onChange={handleChange} className="w-full py-2 outline-none" required />
         </div>
 
-        {/* ✅ Date Picker Fix - Using dayjs and value binding */}
+        {/* ✅ Date Picker Fix: Using dayjs to prevent "t.weekday is not a function" error */}
         <div className="mb-8">
           <label className="text-xs text-gray-500 font-bold block mb-2">Date</label>
           <DatePicker 
@@ -168,16 +154,15 @@ const Home = () => {
           </div>
         </div>
 
-        {/* ✅ Upload Section */}
         <div className="mb-4">
           <label className="text-xs text-gray-500 font-bold block mb-2">Upload file</label>
-          <input type="file" accept="image/*" onChange={handleImageChange} disabled={isImageProcessing} />
-          {isImageProcessing && <p className="text-blue-600 text-xs font-bold mt-1">Uploading to Cloud...</p>}
+          <input type="file" accept="image/*" onChange={handleImageChange} />
+          {isImageProcessing && <p className="text-blue-500 text-xs">Uploading...</p>}
         </div>
 
         {base64Image && (
-          <div className="mb-8 border p-1 inline-block bg-white shadow-sm">
-            <img src={base64Image} alt="Preview" className="h-[80px] w-auto rounded" style={{ objectFit: "cover" }} />
+          <div className="mb-8 border p-2 inline-block">
+            <img src={base64Image} alt="Preview" className="h-[80px] w-auto rounded" />
           </div>
         )}
 
