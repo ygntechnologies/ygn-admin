@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ygn_logo from "../image/ygn.jpg";
 import { baseURL } from "../constant";
 import { DatePicker } from "antd";
-import dayjs from "dayjs"; // Required to fix the white screen crash
+import dayjs from "dayjs"; // ✅ Critical for fixing the white screen crash
 
 const Home = () => {
   const [base64Image, setBase64Image] = useState(null);
@@ -53,7 +53,7 @@ const Home = () => {
     if (isLoggedIn !== "true") navigate("/login");
   }, [isLoggedIn, navigate]);
 
-  // ✅ Cloudinary Upload (Uses dovwuouwx cloud and ygntechnologies preset)
+  // ✅ Cloudinary Upload logic - tested successfully in your media library
   const handleImageChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -75,11 +75,12 @@ const Home = () => {
       const fileData = await resp.json();
       
       if (fileData.secure_url) {
-        setBase64Image(fileData.secure_url); 
-        setFormData((prev) => ({ ...prev, image: fileData.secure_url }));
+        const imageUrl = fileData.secure_url;
+        setBase64Image(imageUrl); 
+        setFormData((prev) => ({ ...prev, image: imageUrl }));
       }
     } catch (err) {
-      setErrorMsg("Image upload failed.");
+      setErrorMsg("Cloud upload failed.");
     } finally {
       setIsImageProcessing(false);
     }
@@ -89,11 +90,11 @@ const Home = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ✅ Fixed Date Change Logic
+  // ✅ Fixed Date Change Logic to prevent crashes
   const handleDateChange = (date, dateString) => {
     setFormData((prev) => ({
       ...prev,
-      date: dateString,
+      date: dateString, // Save as string in state
     }));
   };
 
@@ -101,18 +102,23 @@ const Home = () => {
     e.preventDefault();
     setErrorMsg(null);
 
+    if (isImageProcessing) {
+      setErrorMsg("Please wait for image upload to finish.");
+      return;
+    }
+
     fetch(id ? `${baseURL}/edit-blog/${id}` : `${baseURL}/create-blog`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
     })
       .then((res) => {
-        if (!res.ok) throw new Error();
+        if (!res.ok) throw new Error("Server Rejected Request");
         navigate("/blog-list");
       })
       .catch((err) => {
         //
-        setErrorMsg("Failed to save data. Payload too large or CORS error.");
+        setErrorMsg("Failed to save data. Payload might be too large or CORS error.");
       });
   };
 
@@ -132,7 +138,7 @@ const Home = () => {
           <input name="title" value={formData.title} onChange={handleChange} className="w-full py-2 outline-none" required />
         </div>
 
-        {/* ✅ Date Picker Fix: Using dayjs to prevent "t.weekday is not a function" error */}
+        {/* ✅ Date Picker Fix: Uses dayjs(formData.date) to prevent the weekday TypeError */}
         <div className="mb-8">
           <label className="text-xs text-gray-500 font-bold block mb-2">Date</label>
           <DatePicker 
@@ -140,7 +146,7 @@ const Home = () => {
             value={formData.date ? dayjs(formData.date) : null} 
             onChange={handleDateChange} 
           />
-          {formData.date && <p className="text-xs text-gray-400 mt-1">Saved: {formData.date}</p>}
+          {formData.date && <p className="text-xs text-gray-400 mt-1">Current: {formData.date}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-8">
@@ -157,12 +163,12 @@ const Home = () => {
         <div className="mb-4">
           <label className="text-xs text-gray-500 font-bold block mb-2">Upload file</label>
           <input type="file" accept="image/*" onChange={handleImageChange} />
-          {isImageProcessing && <p className="text-blue-500 text-xs">Uploading...</p>}
+          {isImageProcessing && <p className="text-blue-600 text-xs font-bold mt-1 italic">Uploading to Cloudinary...</p>}
         </div>
 
         {base64Image && (
-          <div className="mb-8 border p-2 inline-block">
-            <img src={base64Image} alt="Preview" className="h-[80px] w-auto rounded" />
+          <div className="mb-8 border p-1 inline-block bg-white shadow-sm">
+            <img src={base64Image} alt="Preview" className="h-[80px] w-auto rounded" style={{ objectFit: "cover" }} />
           </div>
         )}
 
