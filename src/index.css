@@ -7,3 +7,10 @@
 body {
   font-family: "Poppins", sans-serif;
 }
+
+@media (prefers-color-scheme: dark) {
+    .dark\:text-white {
+        --tw-text-opacity: 1 !important;
+        color: rgb(139 139 139) !important;
+    }
+}
