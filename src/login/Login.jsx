@@ -34,7 +34,7 @@ const Login = () => {
         </div>
         <div className="md:w-1/3 max-w-sm">
           <div>
-            <img src={ygn_logo} alt="YGN" style={{width: "50%", padding: "20px", textAlign: "center", margin: "auto"}}/>
+            <img src={ygn_logo} alt="YGN" style={{width: "90%", padding: "10px", textAlign: "center", margin: "auto"}}/>
           </div>
           <div className="text-center md:text-left mb-8">
             <label className="mr-1">Sign in with</label>
