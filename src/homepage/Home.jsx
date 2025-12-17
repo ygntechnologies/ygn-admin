@@ -55,40 +55,33 @@ const Home = () => {
     }
   }, [isLoggedIn, navigate]);
 
-  // ✅ show existing image when editing
+  // Show existing image when editing
   useEffect(() => {
     if (formData?.image) setBase64Image(formData.image);
     else setBase64Image(null);
   }, [formData?.image]);
 
-  // ✅ FIXED: compress + resize, and prevent submit while processing
+  // ✅ OPTION A: hard compress/resize to avoid 413
   const handleImageChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     setErrorMsg(null);
+    setIsImageProcessing(true);
 
     if (!file.type.startsWith("image/")) {
       setErrorMsg("Please select a valid image file.");
+      setIsImageProcessing(false);
       return;
     }
-
-    // optional: original file size guard
-    const maxFileSizeMB = 8;
-    if (file.size > maxFileSizeMB * 1024 * 1024) {
-      setErrorMsg(`Image too large. Please use under ${maxFileSizeMB}MB.`);
-      return;
-    }
-
-    setIsImageProcessing(true);
 
     const img = new Image();
     img.src = URL.createObjectURL(file);
 
     img.onload = () => {
-      // if still failing, reduce these: 800x800 and quality 0.6
-      const maxW = 1200;
-      const maxH = 1200;
+      // Smaller output => smaller request payload
+      const maxW = 600;
+      const maxH = 600;
 
       let w = img.width;
       let h = img.height;
@@ -104,13 +97,19 @@ const Home = () => {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, w, h);
 
-      // Compress
-      const base64String = canvas.toDataURL("image/jpeg", 0.7);
+      // More compression => smaller payload
+      const base64String = canvas.toDataURL("image/jpeg", 0.5);
 
-      setFormData((prev) => ({
-        ...prev,
-        image: base64String,
-      }));
+      // Guard: stop if still too big (~700KB)
+      const approxBytes = Math.ceil((base64String.length * 3) / 4);
+      if (approxBytes > 700 * 1024) {
+        setErrorMsg("Image still too large. Please use a smaller image.");
+        setIsImageProcessing(false);
+        URL.revokeObjectURL(img.src);
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, image: base64String }));
       setBase64Image(base64String);
 
       setIsImageProcessing(false);
@@ -118,8 +117,8 @@ const Home = () => {
     };
 
     img.onerror = () => {
-      setIsImageProcessing(false);
       setErrorMsg("Invalid image file.");
+      setIsImageProcessing(false);
       URL.revokeObjectURL(img.src);
     };
   };
@@ -134,7 +133,7 @@ const Home = () => {
     }
   };
 
-  // ✅ FIXED: store dateString (not date object)
+  // ✅ Fix: store dateString correctly
   const handleDateChange = (date, dateString) => {
     setFormData((prev) => ({
       ...prev,
@@ -162,7 +161,6 @@ const Home = () => {
     fetch(url, options)
       .then((response) => {
         if (!response.ok) {
-          // try to surface payload-size issues
           if (response.status === 413) {
             setErrorMsg("Image too large (413). Use a smaller image.");
           } else {
