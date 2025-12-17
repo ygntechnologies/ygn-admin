@@ -124,7 +124,7 @@ const Home = () => {
           src={ygn_logo}
           alt="YGN"
           className="mix-blend-multiply"
-          style={{ width: "10%" }}
+          style={{ width: "15%" }}
         />
         <div
           onClick={() => navigate("/blog-list")}
