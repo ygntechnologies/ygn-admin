@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ygn_logo from "../image/ygn.jpg";
 import { baseURL } from "../constant";
 import { DatePicker } from "antd";
+import dayjs from "dayjs"; // Recommended for AntD DatePicker value binding
 
 const Home = () => {
   const [base64Image, setBase64Image] = useState(null);
@@ -22,6 +23,7 @@ const Home = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
+  // 1. Fetch Data for Editing
   const getDataById = async () => {
     try {
       setErrorMsg(null);
@@ -35,9 +37,11 @@ const Home = () => {
         name: data.name || "",
         type: data.type || "",
         description: data.description || "",
-        image: data.image || "",
+        image: data.image || "", // Keep existing image
         date: data.date || "",
       });
+      // Sync the preview with the existing image from DB
+      if (data.image) setBase64Image(data.image);
     } catch (error) {
       setErrorMsg("Failed to fetch blog details.");
       console.error(error);
@@ -46,7 +50,6 @@ const Home = () => {
 
   useEffect(() => {
     if (id) getDataById();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -55,13 +58,7 @@ const Home = () => {
     }
   }, [isLoggedIn, navigate]);
 
-  // Show existing image when editing
-  useEffect(() => {
-    if (formData?.image) setBase64Image(formData.image);
-    else setBase64Image(null);
-  }, [formData?.image]);
-
-  // ✅ OPTION A: hard compress/resize to avoid 413
+  // 2. Handle Image Conversion & Compression
   const handleImageChange = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -79,10 +76,8 @@ const Home = () => {
     img.src = URL.createObjectURL(file);
 
     img.onload = () => {
-      // Smaller output => smaller request payload
       const maxW = 600;
       const maxH = 600;
-
       let w = img.width;
       let h = img.height;
 
@@ -97,27 +92,11 @@ const Home = () => {
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, w, h);
 
-      // More compression => smaller payload
-      const base64String = canvas.toDataURL("image/jpeg", 0.5);
-
-      // Guard: stop if still too big (~700KB)
-      const approxBytes = Math.ceil((base64String.length * 3) / 4);
-      if (approxBytes > 700 * 1024) {
-        setErrorMsg("Image still too large. Please use a smaller image.");
-        setIsImageProcessing(false);
-        URL.revokeObjectURL(img.src);
-        return;
-      }
+      // Convert to Base64
+      const base64String = canvas.toDataURL("image/jpeg", 0.7); // Slightly higher quality
 
       setFormData((prev) => ({ ...prev, image: base64String }));
       setBase64Image(base64String);
-
-      setIsImageProcessing(false);
-      URL.revokeObjectURL(img.src);
-    };
-
-    img.onerror = () => {
-      setErrorMsg("Invalid image file.");
       setIsImageProcessing(false);
       URL.revokeObjectURL(img.src);
     };
@@ -125,244 +104,108 @@ const Home = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name !== "image") {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
-    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Fix: store dateString correctly
   const handleDateChange = (date, dateString) => {
-    setFormData((prev) => ({
-      ...prev,
-      date: dateString,
-    }));
+    setFormData((prev) => ({ ...prev, date: dateString }));
   };
 
+  // 3. Submit Logic (Unified Create/Edit)
   const handleSubmit = (e) => {
     e.preventDefault();
-    setErrorMsg(null);
-
-    if (isImageProcessing) {
-      setErrorMsg("Please wait: image is still processing.");
-      return;
-    }
-
-    const options = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
-    };
+    if (isImageProcessing) return;
 
     const url = id ? `${baseURL}/edit-blog/${id}` : `${baseURL}/create-blog`;
+    
+    // In many backends, edit requires specific ID inside body too
+    const payload = id ? { ...formData, _id: id } : formData;
 
-    fetch(url, options)
-      .then((response) => {
+    fetch(url, {
+      method: "POST", // Ensure your backend Edit route accepts POST or change to PUT
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(async (response) => {
         if (!response.ok) {
-          if (response.status === 413) {
-            setErrorMsg("Image too large (413). Use a smaller image.");
-          } else {
-            setErrorMsg("Something went wrong!");
-          }
-          throw new Error("Network response was not ok");
+          const errData = await response.json();
+          throw new Error(errData.message || "Request failed");
         }
         return response.json();
       })
       .then(() => {
-        setFormData({
-          title: "",
-          name: "",
-          type: "",
-          description: "",
-          image: "",
-          date: "",
-        });
-        setBase64Image(null);
         navigate("/blog-list");
       })
       .catch((error) => {
-        console.error("Fetch error:", error);
+        console.error("Submit error:", error);
+        setErrorMsg(error.message);
       });
   };
 
   return (
     <>
+      {/* Navbar Section */}
       <div className="flex relative justify-between py-[10px] items-center px-[40px] bg-slate-100 border-b border-slate-300 mb-5">
-        <img
-          src={ygn_logo}
-          alt="YGN"
-          className="mix-blend-multiply"
-          style={{ width: "10%" }}
-        />
-
-        <div onClick={() => navigate("/blog-list")} style={{ cursor: "pointer" }}>
-          <b>BlogList</b>
-        </div>
-
-        <div
-          onClick={() => {
-            localStorage.removeItem("isLoggedIn");
-            window.location.reload();
-          }}
-          className="px-[23px] py-[8px] border-slate-400 border rounded-md cursor-pointer bg-slate-500 text-white"
-        >
+        <img src={ygn_logo} alt="YGN" className="mix-blend-multiply" style={{ width: "10%" }} />
+        <div onClick={() => navigate("/blog-list")} className="cursor-pointer font-bold">BlogList</div>
+        <div onClick={() => { localStorage.removeItem("isLoggedIn"); window.location.reload(); }} className="px-[23px] py-[8px] border-slate-400 border rounded-md cursor-pointer bg-slate-500 text-white">
           Logout
         </div>
       </div>
 
-      <form
-        className="shadow-xl max-w-[800px] w-full mx-auto px-[60px] py-[40px] border-[2px] border-gray-400 rounded-md"
-        onSubmit={handleSubmit}
-      >
-        <h1
-          style={{
-            fontSize: "24px",
-            textAlign: "center",
-            paddingBottom: "40px",
-            fontWeight: "600",
-          }}
-        >
-          {id ? "Update Blog" : "Create A Blog"}
-        </h1>
+      <form className="shadow-xl max-w-[800px] w-full mx-auto px-[60px] py-[40px] border-[2px] border-gray-400 rounded-md" onSubmit={handleSubmit}>
+        <h1 className="text-[24px] text-center pb-10 font-semibold">{id ? "Update Blog" : "Create A Blog"}</h1>
 
+        {/* Title Field */}
         <div className="relative z-0 w-full mb-10 group">
-          <input
-            type="text"
-            name="title"
-            id="title"
-            className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer"
-            placeholder=" "
-            onChange={handleChange}
-            required
-            value={formData.title}
-          />
-          <label
-            htmlFor="title"
-            className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6"
-          >
-            Title
-          </label>
+          <input type="text" name="title" id="title" className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 focus:outline-none focus:border-blue-600 peer" placeholder=" " onChange={handleChange} required value={formData.title} />
+          <label htmlFor="title" className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6">Title</label>
         </div>
 
-        <div className="relative max-w-sm my-4">
-          <label
-            htmlFor="date"
-            className="peer-focus:font-medium absolute text-[18px] text-gray-500 duration-300 transform -translate-y-6 scale-75 top-0 -z-10 origin-[0] peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6"
-          >
-            Date
-          </label>
-
-          <DatePicker
-            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full ps-10 p-2.5"
-            placeholder="Select date"
-            onChange={handleDateChange}
+        {/* Date Field */}
+        <div className="relative max-w-sm my-10">
+          <label className="text-gray-500 text-sm block mb-2">Date</label>
+          <DatePicker 
+             className="w-full" 
+             onChange={handleDateChange} 
+             value={formData.date ? dayjs(formData.date) : null} 
           />
-
-          {formData.date ? (
-            <div className="text-sm text-gray-500 mt-2">Saved: {formData.date}</div>
-          ) : null}
         </div>
 
         <div className="grid md:grid-cols-2 md:gap-6">
           <div className="relative z-0 w-full mb-7 group">
-            <input
-              type="text"
-              name="name"
-              id="name"
-              className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer"
-              placeholder=" "
-              onChange={handleChange}
-              required
-              value={formData.name}
-            />
-            <label
-              htmlFor="name"
-              className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6"
-            >
-              Name
-            </label>
+            <input type="text" name="name" value={formData.name} onChange={handleChange} className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 focus:outline-none focus:border-blue-600 peer" placeholder=" " required />
+            <label className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10">Name</label>
           </div>
-
           <div className="relative z-0 w-full mb-7 group">
-            <input
-              type="text"
-              name="type"
-              id="type"
-              className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer"
-              placeholder=" "
-              onChange={handleChange}
-              required
-              value={formData.type}
-            />
-            <label
-              htmlFor="type"
-              className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10 origin-[0] peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6"
-            >
-              Type
-            </label>
+            <input type="text" name="type" value={formData.type} onChange={handleChange} className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 focus:outline-none focus:border-blue-600 peer" placeholder=" " required />
+            <label className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-3 -z-10">Type</label>
           </div>
         </div>
 
-        <div className="flex flex-col mb-10 relative mt-5">
-          <label
-            className="peer-focus:font-medium absolute text-[18px] text-gray-500 duration-300 transform -translate-y-6 scale-75 top-0 -z-10 origin-[0]"
-            htmlFor="image"
-          >
-            Upload file
-          </label>
-
-          <input
-            name="image"
-            onChange={handleImageChange}
-            className="block cursor-pointer bg-gray-50 focus:outline-none"
-            aria-describedby="image"
-            id="image"
-            type="file"
-            accept="image/*"
-          />
-
-          {isImageProcessing && (
-            <div className="text-sm text-blue-600 mt-2">Processing image...</div>
+        {/* Image Upload */}
+        <div className="flex flex-col mb-10 mt-5">
+          <label className="text-gray-500 mb-2">Upload Image</label>
+          <input name="image" onChange={handleImageChange} className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" type="file" accept="image/*" />
+          {base64Image && (
+            <div className="mt-4">
+              <p className="text-xs text-gray-400">Preview:</p>
+              <img src={base64Image} alt="Preview" className="h-[100px] w-auto rounded border" />
+            </div>
           )}
         </div>
 
-        {base64Image && (
-          <img
-            src={base64Image}
-            alt="Uploaded"
-            className="max-w-full h-[80px] mt-4 mb-8"
-            style={{ objectFit: "cover" }}
-          />
-        )}
-
+        {/* Description */}
         <div className="relative z-0 w-full mb-5 group">
-          <textarea
-            id="description"
-            name="description"
-            rows="4"
-            value={formData.description}
-            onChange={handleChange}
-            className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 appearance-none focus:outline-none focus:ring-0 focus:border-blue-600 peer"
-          />
-          <label
-            htmlFor="description"
-            className="peer-focus:font-medium absolute text-[18px] text-gray-500 duration-300 transform -translate-y-6 scale-75 top-0 -z-10 origin-[0] peer-focus:text-blue-600 peer-placeholder-shown:scale-100 peer-placeholder-shown:translate-y-0 peer-focus:scale-75 peer-focus:-translate-y-6"
-          >
-            Description
-          </label>
+          <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className="block py-2.5 px-0 w-full text-sm text-gray-900 bg-transparent border-0 border-b-2 border-gray-300 focus:outline-none focus:border-blue-600 peer" required />
+          <label className="peer-focus:font-medium absolute text-sm text-gray-500 duration-300 transform -translate-y-6 scale-75 top-0 -z-10">Description</label>
         </div>
 
-        <button
-          type="submit"
-          disabled={isImageProcessing}
-          className="text-white mt-4 bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-8 py-2.5 text-center disabled:opacity-60"
-        >
-          {isImageProcessing ? "Processing Image..." : id ? "Update" : "Submit"}
+        <button type="submit" disabled={isImageProcessing} className="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm w-full sm:w-auto px-8 py-2.5 disabled:opacity-50">
+          {isImageProcessing ? "Processing..." : id ? "Update Blog" : "Submit Blog"}
         </button>
 
-        {errorMsg && <div className="text-[16px] text-red-600 mt-4">{errorMsg}</div>}
+        {errorMsg && <div className="text-red-600 mt-4 font-semibold">{errorMsg}</div>}
       </form>
     </>
   );
