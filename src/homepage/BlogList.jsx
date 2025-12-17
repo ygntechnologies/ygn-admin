@@ -105,7 +105,7 @@ const BlogList = () => {
 
 		<div>
 			<div className="flex relative justify-between py-[10px] items-center px-[40px] bg-slate-100 border-b border-slate-300 mb-5">
-				<img src={ygn_logo} alt="YGN" className="mix-blend-multiply" style={{ width: "10%" }} />
+				<img src={ygn_logo} alt="YGN" className="mix-blend-multiply" style={{ width: "15%" }} />
 				<div onClick={() => navigate("/")} style={{ cursor: 'pointer' }}>
 					<b>Home</b>
 				</div>
