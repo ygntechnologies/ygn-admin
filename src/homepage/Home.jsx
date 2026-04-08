@@ -19,7 +19,7 @@ const Home = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // ✅ FIX: wrapped in useCallback
+  // FIX: wrapped in useCallback
   const getDataById = useCallback(async () => {
     try {
       const response = await fetch(`${baseURL}/get-blog-details?_id=${id}`);
@@ -32,7 +32,7 @@ const Home = () => {
     }
   }, [id]);
 
-  // ✅ FIX: dependency added properly
+  // FIX: dependency added properly
   useEffect(() => {
     if (id) getDataById();
   }, [id, getDataById]);
@@ -155,7 +155,7 @@ const Home = () => {
           className="w-full mb-4 border-b p-2"
         />
 
-        {/* ✅ Image Preview */}
+        {/* Image Preview */}
         {formData.image && (
           <img
             src={formData.image}
