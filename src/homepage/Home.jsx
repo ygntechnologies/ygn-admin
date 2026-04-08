@@ -6,6 +6,7 @@ import { baseURL } from "../constant";
 
 const Home = () => {
   const [errorMsg, setErrorMsg] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
     name: "",
@@ -51,23 +52,37 @@ const Home = () => {
     setFormData(prev => ({ ...prev, date: dateString }));
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setErrorMsg("Please select a valid image file.");
-      return;
-    }
+    const MAX_WIDTH = 800;
+    const MAX_HEIGHT = 600;
+    const QUALITY = 0.7;
 
-    // Data URLs keep backend unchanged (it still stores a string image field).
     const reader = new FileReader();
-    reader.onload = () => {
-      setErrorMsg(null);
-      setFormData((prev) => ({ ...prev, image: reader.result || "" }));
-    };
-    reader.onerror = () => {
-      setErrorMsg("Unable to read image file. Please try another image.");
+    reader.onloadend = () => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+          const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+
+        const compressed = canvas.toDataURL("image/jpeg", QUALITY);
+        setFormData(prev => ({ ...prev, image: compressed }));
+        setPreviewImage(compressed);
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   };
@@ -162,24 +177,18 @@ const Home = () => {
           className="w-full mb-5 border-b p-2"
         />
 
-        <input
-          type="text"
-          name="image"
-          placeholder="Image URL"
-          onChange={handleChange}
-          value={formData.image}
-          className="w-full mb-5 border-b p-2"
-        />
+        <div className="w-full mb-5">
+          <label className="block text-sm text-gray-500 mb-2">Upload Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageChange}
+            className="w-full border-b p-2 cursor-pointer"
+          />
+        </div>
 
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          className="w-full mb-5 border-b p-2"
-        />
-
-        {formData.image && (
-          <img src={formData.image} alt="preview" className="h-20 mb-5" />
+        {previewImage && (
+          <img src={previewImage} alt="preview" className="h-20 mb-5" />
         )}
 
         <textarea
