@@ -22,38 +22,33 @@ const Home = () => {
   const getDataById = async () => {
     try {
       const response = await fetch(`${baseURL}/get-blog-details?_id=${id}`);
-      if (!response.ok) throw new Error("Fetch failed");
+      if (!response.ok) throw new Error();
 
-      const responseData = await response.json();
-      setFormData(responseData?.data);
-    } catch (error) {
-      setErrorMsg(error.message);
+      const data = await response.json();
+      setFormData(data?.data);
+    } catch {
+      setErrorMsg("Failed to load blog");
     }
   };
 
   useEffect(() => {
     if (id) getDataById();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
-    if (isLoggedIn !== "true") {
-      navigate("/login");
-    }
+    if (isLoggedIn !== "true") navigate("/login");
   }, [isLoggedIn, navigate]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData({ ...formData, [e.target.name]: e.target.value.trim() });
   };
 
   const handleDateChange = (_, dateString) => {
-    setFormData(prev => ({ ...prev, date: dateString }));
+    setFormData({ ...formData, date: dateString });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setErrorMsg(null);
 
     const url = id
       ? `${baseURL}/edit-blog/${id}`
@@ -61,22 +56,13 @@ const Home = () => {
 
     fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify(formData),
     })
       .then(res => {
         if (!res.ok) throw new Error();
-        return res.json();
-      })
-      .then(() => {
-        setFormData({
-          title: "",
-          name: "",
-          type: "",
-          description: "",
-          image: "",
-          date: "",
-        });
         navigate("/blog-list");
       })
       .catch(() => setErrorMsg("Something went wrong"));
@@ -92,7 +78,7 @@ const Home = () => {
             localStorage.removeItem("isLoggedIn");
             window.location.reload();
           }}
-          className="cursor-pointer bg-slate-500 text-white px-4 py-2 rounded"
+          className="bg-gray-600 text-white px-4 py-2 rounded cursor-pointer"
         >
           Logout
         </div>
@@ -102,65 +88,39 @@ const Home = () => {
         className="max-w-[800px] mx-auto p-10 border rounded shadow"
         onSubmit={handleSubmit}
       >
-        <h1 className="text-xl font-semibold text-center mb-10">
+        <h1 className="text-xl text-center mb-8">
           {id ? "Edit Blog" : "Create Blog"}
         </h1>
 
-        <input
-          type="text"
-          name="title"
-          placeholder="Title"
-          onChange={handleChange}
-          value={formData.title}
-          required
-          className="w-full mb-5 border-b p-2"
-        />
+        <input name="title" placeholder="Title" onChange={handleChange}
+          value={formData.title} required className="w-full mb-4 border-b p-2" />
 
-        <DatePicker
-          className="w-full mb-5"
-          onChange={handleDateChange}
-        />
+        <DatePicker className="w-full mb-4" onChange={handleDateChange} />
 
-        <input
-          type="text"
-          name="name"
-          placeholder="Name"
-          onChange={handleChange}
-          value={formData.name}
-          required
-          className="w-full mb-5 border-b p-2"
-        />
+        <input name="name" placeholder="Name" onChange={handleChange}
+          value={formData.name} required className="w-full mb-4 border-b p-2" />
 
-        <input
-          type="text"
-          name="type"
-          placeholder="Type"
-          onChange={handleChange}
-          value={formData.type}
-          required
-          className="w-full mb-5 border-b p-2"
-        />
+        <input name="type" placeholder="Type" onChange={handleChange}
+          value={formData.type} required className="w-full mb-4 border-b p-2" />
 
-        <input
-          type="text"
-          name="image"
-          placeholder="Image URL"
+        <input name="image" placeholder="Image URL"
           onChange={handleChange}
           value={formData.image}
-          className="w-full mb-5 border-b p-2"
-        />
+          className="w-full mb-4 border-b p-2" />
 
         {formData.image && (
-          <img src={formData.image} alt="preview" className="h-20 mb-5" />
+          <img
+            src={formData.image}
+            alt="preview"
+            className="h-32 mb-4 rounded"
+            onError={(e) => e.target.style.display = "none"}
+          />
         )}
 
-        <textarea
-          name="description"
-          placeholder="Description"
+        <textarea name="description" placeholder="Description"
           onChange={handleChange}
           value={formData.description}
-          className="w-full mb-5 border-b p-2"
-        />
+          className="w-full mb-4 border-b p-2" />
 
         <button className="bg-blue-600 text-white px-6 py-2 rounded">
           {id ? "Update" : "Submit"}
