@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { DatePicker } from "antd";
 import ygn_logo from "../image/ygn.jpg";
 import { baseURL } from "../constant";
-import { DatePicker } from "antd";
-import { useParams } from "react-router-dom";
 
 const Home = () => {
   const [errorMsg, setErrorMsg] = useState(null);
@@ -23,66 +22,50 @@ const Home = () => {
   const getDataById = async () => {
     try {
       const response = await fetch(`${baseURL}/get-blog-details?_id=${id}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch data");
-      }
+      if (!response.ok) throw new Error("Fetch failed");
+
       const responseData = await response.json();
       setFormData(responseData?.data);
     } catch (error) {
-      setErrorMsg(error);
+      setErrorMsg(error.message);
     }
   };
 
   useEffect(() => {
-    if (id) {
-      getDataById();
-    }
+    if (id) getDataById();
   }, [id]);
 
   useEffect(() => {
     if (isLoggedIn !== "true") {
       navigate("/login");
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleDateChange = (date, dateString) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      date: dateString,
-    }));
+  const handleDateChange = (_, dateString) => {
+    setFormData(prev => ({ ...prev, date: dateString }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    const options = {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(formData),
-    };
-
     const url = id
       ? `${baseURL}/edit-blog/${id}`
       : `${baseURL}/create-blog`;
 
-    fetch(url, options)
-      .then((response) => {
-        if (!response.ok) {
-          setErrorMsg("Something Went Wrong!");
-          throw new Error("Network response was not ok");
-        }
-        return response.json();
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    })
+      .then(res => {
+        if (!res.ok) throw new Error();
+        return res.json();
       })
       .then(() => {
         setFormData({
@@ -95,129 +78,94 @@ const Home = () => {
         });
         navigate("/blog-list");
       })
-      .catch((error) => {
-        setErrorMsg("Something Went Wrong!");
-        console.error("There was a problem with the fetch operation:", error);
-      });
+      .catch(() => setErrorMsg("Something went wrong"));
   };
 
   return (
     <>
-      <div className="flex relative justify-between py-[10px] items-center px-[40px] bg-slate-100 border-b border-slate-300 mb-5">
-        <img
-          src={ygn_logo}
-          alt="YGN"
-          className="mix-blend-multiply"
-          style={{ width: "10%" }}
-        />
-        <div onClick={() => navigate("/blog-list")} style={{ cursor: "pointer" }}>
-          <b>BlogList</b>
-        </div>
+      <div className="flex justify-between py-3 px-10 bg-slate-100 border-b mb-5">
+        <img src={ygn_logo} alt="YGN" style={{ width: "10%" }} />
+        <div onClick={() => navigate("/blog-list")}>BlogList</div>
         <div
           onClick={() => {
             localStorage.removeItem("isLoggedIn");
             window.location.reload();
           }}
-          className="px-[23px] py-[8px] border-slate-400 border rounded-md cursor-pointer bg-slate-500 text-white"
+          className="cursor-pointer bg-slate-500 text-white px-4 py-2 rounded"
         >
           Logout
         </div>
       </div>
 
       <form
-        className="shadow-xl max-w-[800px] w-full mx-auto px-[60px] py-[40px] border-[2px] border-gray-400 rounded-md"
+        className="max-w-[800px] mx-auto p-10 border rounded shadow"
         onSubmit={handleSubmit}
       >
-        <h1 className="text-[24px] text-center pb-[40px] font-semibold">
-          Create A Blog
+        <h1 className="text-xl font-semibold text-center mb-10">
+          {id ? "Edit Blog" : "Create Blog"}
         </h1>
 
-        <div className="relative z-0 w-full mb-10 group">
-          <input
-            type="text"
-            name="title"
-            className="input-style"
-            onChange={handleChange}
-            required
-            value={formData.title}
-          />
-          <label className="label-style">Title</label>
-        </div>
+        <input
+          type="text"
+          name="title"
+          placeholder="Title"
+          onChange={handleChange}
+          value={formData.title}
+          required
+          className="w-full mb-5 border-b p-2"
+        />
 
-        <div className="relative max-w-sm my-4">
-          <label className="label-style text-[18px]">Date</label>
-          <DatePicker
-            className="input-box"
-            placeholder="Select date"
-            onChange={handleDateChange}
-          />
-        </div>
+        <DatePicker
+          className="w-full mb-5"
+          onChange={handleDateChange}
+        />
 
-        <div className="grid md:grid-cols-2 md:gap-6">
-          <div className="relative z-0 w-full mb-7 group">
-            <input
-              type="text"
-              name="name"
-              className="input-style"
-              onChange={handleChange}
-              required
-              value={formData.name}
-            />
-            <label className="label-style">Name</label>
-          </div>
+        <input
+          type="text"
+          name="name"
+          placeholder="Name"
+          onChange={handleChange}
+          value={formData.name}
+          required
+          className="w-full mb-5 border-b p-2"
+        />
 
-          <div className="relative z-0 w-full mb-7 group">
-            <input
-              type="text"
-              name="type"
-              className="input-style"
-              onChange={handleChange}
-              required
-              value={formData.type}
-            />
-            <label className="label-style">Type</label>
-          </div>
-        </div>
+        <input
+          type="text"
+          name="type"
+          placeholder="Type"
+          onChange={handleChange}
+          value={formData.type}
+          required
+          className="w-full mb-5 border-b p-2"
+        />
 
-        <div className="relative z-0 w-full mb-10 group mt-5">
-          <input
-            type="text"
-            name="image"
-            className="input-style"
-            onChange={handleChange}
-            value={formData.image}
-          />
-          <label className="label-style">Image URL</label>
-        </div>
+        <input
+          type="text"
+          name="image"
+          placeholder="Image URL"
+          onChange={handleChange}
+          value={formData.image}
+          className="w-full mb-5 border-b p-2"
+        />
 
         {formData.image && (
-          <img
-            src={formData.image}
-            alt="Preview"
-            className="max-w-full h-[80px] mt-[-20px] mb-8"
-            onError={(e) => (e.target.style.display = "none")}
-          />
+          <img src={formData.image} alt="preview" className="h-20 mb-5" />
         )}
 
-        <div className="relative z-0 w-full mb-5 group">
-          <textarea
-            name="description"
-            rows="4"
-            value={formData.description}
-            onChange={handleChange}
-            className="input-style"
-          ></textarea>
-          <label className="label-style text-[18px]">Description</label>
-        </div>
+        <textarea
+          name="description"
+          placeholder="Description"
+          onChange={handleChange}
+          value={formData.description}
+          className="w-full mb-5 border-b p-2"
+        />
 
-        <button
-          type="submit"
-          className="text-white mt-4 bg-blue-700 hover:bg-blue-800 rounded-lg text-sm px-8 py-2.5"
-        >
+        <button className="bg-blue-600 text-white px-6 py-2 rounded">
           {id ? "Update" : "Submit"}
         </button>
 
-        {errorMsg && <div className="text-red-600">{errorMsg}</div>}
+        {errorMsg && <div className="text-red-500 mt-3">{errorMsg}</div>}
       </form>
     </>
   );
