@@ -51,6 +51,27 @@ const Home = () => {
     setFormData(prev => ({ ...prev, date: dateString }));
   };
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("Please select a valid image file.");
+      return;
+    }
+
+    // Data URLs keep backend unchanged (it still stores a string image field).
+    const reader = new FileReader();
+    reader.onload = () => {
+      setErrorMsg(null);
+      setFormData((prev) => ({ ...prev, image: reader.result || "" }));
+    };
+    reader.onerror = () => {
+      setErrorMsg("Unable to read image file. Please try another image.");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -147,6 +168,13 @@ const Home = () => {
           placeholder="Image URL"
           onChange={handleChange}
           value={formData.image}
+          className="w-full mb-5 border-b p-2"
+        />
+
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleImageUpload}
           className="w-full mb-5 border-b p-2"
         />
 
