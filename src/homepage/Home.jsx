@@ -24,9 +24,15 @@ const Home = () => {
     try {
       const response = await fetch(`${baseURL}/get-blog-details?_id=${id}`);
       if (!response.ok) throw new Error("Fetch failed");
-
       const responseData = await response.json();
       setFormData(responseData?.data);
+      // Load image from localStorage if backend doesn't have it
+      const localImage = localStorage.getItem(`blog_image_${id}`);
+      if (localImage && !responseData?.data?.image) {
+        setPreviewImage(localImage);
+      } else if (responseData?.data?.image) {
+        setPreviewImage(responseData?.data?.image);
+      }
     } catch (error) {
       setErrorMsg(error.message);
     }
@@ -95,16 +101,24 @@ const Home = () => {
       ? `${baseURL}/edit-blog/${id}`
       : `${baseURL}/create-blog`;
 
+    // Save without image field to avoid backend size issues
+    const { image, ...dataWithoutImage } = formData;
+
     fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(formData),
+      body: JSON.stringify(dataWithoutImage),
     })
       .then(res => {
         if (!res.ok) throw new Error();
         return res.json();
       })
-      .then(() => {
+      .then((result) => {
+        // Save image to localStorage using the blog _id
+        const blogId = id || result?.data?._id || result?._id;
+        if (blogId && image) {
+          localStorage.setItem(`blog_image_${blogId}`, image);
+        }
         setFormData({
           title: "",
           name: "",
@@ -113,6 +127,7 @@ const Home = () => {
           image: "",
           date: "",
         });
+        setPreviewImage(null);
         navigate("/blog-list");
       })
       .catch(() => setErrorMsg("Something went wrong"));
@@ -122,7 +137,7 @@ const Home = () => {
     <>
       <div className="flex justify-between py-3 px-10 bg-slate-100 border-b mb-5">
         <img src={ygn_logo} alt="YGN" style={{ width: "10%" }} />
-        <div onClick={() => navigate("/blog-list")}>BlogList</div>
+        <div onClick={() => navigate("/blog-list")} style={{ cursor: "pointer" }}>BlogList</div>
         <div
           onClick={() => {
             localStorage.removeItem("isLoggedIn");
